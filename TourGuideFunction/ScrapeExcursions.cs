@@ -2,6 +2,7 @@ using System;
 using Azure.Communication.Email;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
+using TourGuideFunction.Emails;
 
 namespace TourGuideFunction
 {
