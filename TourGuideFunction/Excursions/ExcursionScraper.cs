@@ -1,4 +1,5 @@
 ﻿using PuppeteerSharp;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace TourGuideFunction.Excursions
@@ -7,6 +8,7 @@ namespace TourGuideFunction.Excursions
     {
         private static readonly Regex PriceRegex = new(@"^(?<price>\d+)", RegexOptions.Compiled);
         private static readonly Regex NightsRegex = new(@"\(.*\)$", RegexOptions.Compiled);
+        private static readonly CultureInfo PolishCulture = CultureInfo.CreateSpecificCulture("pl-PL");
 
         public static async Task<Excursion> GetExcursionAsync(IPage page, Uri uri)
         {
@@ -36,7 +38,7 @@ namespace TourGuideFunction.Excursions
 
             var parts = rawResult.Split(" - ");
 
-            return (DateTimeOffset.Parse(parts[0]), DateTimeOffset.Parse(parts[1]));
+            return (DateTimeOffset.Parse(parts[0], PolishCulture), DateTimeOffset.Parse(parts[1], PolishCulture));
         }
         private static async Task<string> GetOriginCityAsync(IPage page)
         {
