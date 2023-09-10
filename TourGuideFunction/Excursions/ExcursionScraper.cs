@@ -8,16 +8,12 @@ namespace TourGuideFunction.Excursions
         private static readonly Regex PriceRegex = new(@"^(?<price>\d+)", RegexOptions.Compiled);
         private static readonly Regex NightsRegex = new(@"\(.*\)$", RegexOptions.Compiled);
 
-        public static async Task<Excursion> GetExcursionAsync(Uri uri)
+        public static async Task<Excursion> GetExcursionAsync(IPage page, Uri uri)
         {
-            await Puppeteer.CreateBrowserFetcher(new BrowserFetcherOptions()).DownloadAsync();
-            var browser = await Puppeteer.LaunchAsync(new LaunchOptions { DefaultViewport = new ViewPortOptions { Width = 1200 } });
-            var page = await browser.NewPageAsync();
             await page.GoToAsync(uri.ToString(), new NavigationOptions
             {
                 WaitUntil = new[] { WaitUntilNavigation.Networkidle2 }
             });
-
 
             var name = await GetNameAsync(page);
             var (dateFrom, dateTo) = await GetDatesAsync(page);

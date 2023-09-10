@@ -2,7 +2,9 @@ using System;
 using Azure.Communication.Email;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
+using PuppeteerSharp;
 using TourGuideFunction.Emails;
+using TourGuideFunction.Excursions;
 
 namespace TourGuideFunction
 {
@@ -18,9 +20,33 @@ namespace TourGuideFunction
         }
 
         [Function("ScrapeExcursions")]
-        public async Task Run([TimerTrigger("0 */5 * * * *")] MyInfo myTimer)
+        public async Task Run([TimerTrigger("0 */2 * * * *")] MyInfo myTimer)
         {
-            await _emailSender.SendAsync();
+
+            try
+            {
+                var excursionUris = Environment.GetEnvironmentVariable("SCRAPED_EXCURSIONS")!.Split(',').Select(x => new Uri(x)).ToList();
+                var excursions = new List<Excursion>(excursionUris.Count);
+
+                using var browser = await Puppeteer.ConnectAsync(new ConnectOptions()
+                {
+                    DefaultViewport = new ViewPortOptions { Width = 1200 },
+                    BrowserWSEndpoint = Environment.GetEnvironmentVariable("BROWSERLESS_CONNECTION_STRING"),
+                });
+                using var page = await browser.NewPageAsync();
+
+                foreach (var uri in excursionUris)
+                {
+                    var excursion = await ExcursionScraper.GetExcursionAsync(page, uri);
+                    excursions.Add(excursion);
+                }
+
+                await _emailSender.SendAsync(excursions);
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError("exception: {Message}", ex.Message);
+            }
         }
 
     }
