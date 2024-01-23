@@ -20,7 +20,7 @@ namespace TourGuideFunction
         }
 
         [Function("ScrapeExcursions")]
-        public async Task Run([TimerTrigger("0 */2 * * * *")] MyInfo myTimer)
+        public async Task Run([TimerTrigger("0 0 12-14 * * *")] MyInfo myTimer)
         {
 
             try
