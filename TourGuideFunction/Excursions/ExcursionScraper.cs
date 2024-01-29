@@ -37,8 +37,10 @@ namespace TourGuideFunction.Excursions
             rawResult = NightsRegex.Replace(rawResult, "");
 
             var parts = rawResult.Split(" - ");
+            var dateFromString = parts[0];
+            var dateToString = RemoveAfterFirstSpace(parts[1]);
 
-            return (DateTimeOffset.Parse(parts[0], PolishCulture), DateTimeOffset.Parse(parts[1], PolishCulture));
+            return (DateTimeOffset.Parse(dateFromString, PolishCulture), DateTimeOffset.Parse(dateToString, PolishCulture));
         }
         private static async Task<string> GetOriginCityAsync(IPage page)
         {
@@ -56,5 +58,10 @@ namespace TourGuideFunction.Excursions
             return int.Parse(match.Groups["price"].Value);
         }
 
+        private static string RemoveAfterFirstSpace(string input)
+        {
+            var spaceIndex = input.IndexOf(' ');
+            return spaceIndex != -1 ? input[..spaceIndex] : input;
+        }
     }
 }
