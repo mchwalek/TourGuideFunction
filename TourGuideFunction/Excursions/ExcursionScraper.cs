@@ -44,7 +44,7 @@ namespace TourGuideFunction.Excursions
         }
         private static async Task<string> GetOriginCityAsync(IPage page)
         {
-            const string script = "document.querySelector('.kh__container-right > div > div:nth-child(3) span').innerText";
+            const string script = "document.querySelector('.kh__container-right div.kh-konfigurator div:nth-child(3) span').innerText";
             return await page.EvaluateExpressionAsync<string>(script);
         }
 
