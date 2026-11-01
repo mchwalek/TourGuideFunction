@@ -17,8 +17,8 @@ namespace TourGuideFunctionTests.Emails
         {
             var excursions = new List<Excursion>()
             {
-                new("Exc1", new DateTimeOffset(2023, 9, 1, 0, 0, 0, TimeSpan.Zero), new DateTimeOffset(2023, 9, 2, 0, 0, 0, TimeSpan.Zero), "Katowice", 123),
-                new("Exc2", new DateTimeOffset(2023, 10, 1, 0, 0, 0, TimeSpan.Zero), new DateTimeOffset(2023, 10, 2, 0, 0, 0, TimeSpan.Zero), "Warszawa", 456),
+                new("Exc1", new DateOnly(2023, 9, 1), new DateOnly(2023, 9, 2), "Katowice", 123),
+                new("Exc2", new DateOnly(2023, 10, 1), new DateOnly(2023, 10, 2), "Warszawa", 456),
             };
 
             var result = EmailFormatter.Format(excursions);
