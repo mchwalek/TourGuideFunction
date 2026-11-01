@@ -10,8 +10,16 @@ namespace TourGuideFunction.Excursions
         private static readonly Regex PriceRegex = new(@"^(?<price>\d+)", RegexOptions.Compiled);
         private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
 
+        // shortcut: copy of r.pl/robots.txt disallow rules as of 2026-11, re-check robots.txt if r.pl changes it.
+        private static readonly Regex DisallowedPathRegex = new(
+            @"^/(api|szukaj|[^/]+/szukaj|rezerwacja|dodajopinie|opinie/dodaj|bilety-czarterowe/(szukaj|rezerwacja))(/|\?|$)|idZamowienia=",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         public static async Task<Excursion?> GetExcursionAsync(HttpClient httpClient, Uri uri)
         {
+            if (uri.Host is not ("r.pl" or "www.r.pl") || DisallowedPathRegex.IsMatch(uri.PathAndQuery))
+                throw new InvalidOperationException($"{uri} is not an r.pl page allowed by robots.txt.");
+
             var html = await httpClient.GetStringAsync(uri);
             return Parse(html);
         }
@@ -28,8 +36,10 @@ namespace TourGuideFunction.Excursions
             var dates = OwnText(FindByTestId(document, "r-select-button:kartaHotelu-konfigurator:termin")?.SelectSingleNode(".//h5"));
             var origin = OwnText(FindByTestId(document, "r-select-button:kartaHotelu-konfigurator:polaczenie")?.SelectSingleNode(".//h5"));
             var price = OwnText(FindByTestId(document, "r-typography:kartaHotelu-konfigurator-cenaPodsumowanie:cenaZaOsobe"));
-            if (dates is null || origin is null || price is null)
+            if (dates is null && origin is null && price is null)
                 return null;
+            if (dates is null || origin is null || price is null)
+                throw new InvalidOperationException("Offer configurator incomplete - page layout may have changed.");
 
             var datesMatch = DatesRegex.Match(dates);
             var priceMatch = PriceRegex.Match(WhitespaceRegex.Replace(price, ""));

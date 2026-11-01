@@ -20,11 +20,14 @@ namespace TourGuideFunction.Excursions
             _delayBetweenRequests = delayBetweenRequests;
         }
 
-        /// <returns>Email body, or null when there is nothing to report.</returns>
-        public async Task<string?> CheckAsync(DateTimeOffset now)
+        /// <summary>Nothing is persisted until <paramref name="sendReport"/> succeeds, so a failed email is retried next run.</summary>
+        /// <returns>The report sent, or null when there was nothing to report.</returns>
+        public async Task<string?> CheckAsync(DateTimeOffset now, Func<string, Task> sendReport)
         {
             var drops = new List<PriceDrop>();
             var unavailable = new List<UnavailableExcursion>();
+            var failed = new List<FailedExcursion>();
+            var writes = new List<Func<Task>>();
             var excursions = await _store.GetEnabledExcursionsAsync();
 
             for (var i = 0; i < excursions.Count; i++)
@@ -44,25 +47,50 @@ namespace TourGuideFunction.Excursions
                         if (tracked.LastStatus != ExcursionStatus.Unavailable)
                         {
                             unavailable.Add(new UnavailableExcursion(tracked.Url, tracked.ExpectedDateFrom, tracked.ExpectedOrigin));
-                            await _store.SetLastStatusAsync(tracked.RowKey, ExcursionStatus.Unavailable);
+                            writes.Add(() => _store.SetLastStatusAsync(tracked.RowKey, ExcursionStatus.Unavailable));
                         }
                         continue;
                     }
 
                     var lowest = await _store.GetLowestPriceAsync(tracked.RowKey);
-                    await _store.AddPricePointAsync(PricePoint.Create(tracked.RowKey, now, scraped));
+                    writes.Add(() => _store.AddPricePointAsync(PricePoint.Create(tracked.RowKey, now, scraped)));
                     if (PriceRules.ShouldNotify(scraped.Price, tracked.Threshold, lowest))
                         drops.Add(new PriceDrop(scraped, lowest!.Value, tracked.Url));
                     if (tracked.LastStatus != ExcursionStatus.Available)
-                        await _store.SetLastStatusAsync(tracked.RowKey, ExcursionStatus.Available);
+                        writes.Add(() => _store.SetLastStatusAsync(tracked.RowKey, ExcursionStatus.Available));
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Checking excursion {Id} failed", tracked.RowKey);
+                    if (tracked.LastStatus != ExcursionStatus.Error)
+                    {
+                        failed.Add(new FailedExcursion(tracked.Url, ex.Message));
+                        writes.Add(() => _store.SetLastStatusAsync(tracked.RowKey, ExcursionStatus.Error));
+                    }
                 }
             }
 
-            return drops.Count == 0 && unavailable.Count == 0 ? null : EmailFormatter.Format(drops, unavailable);
+            string? report = null;
+            if (drops.Count > 0 || unavailable.Count > 0 || failed.Count > 0)
+            {
+                report = EmailFormatter.Format(drops, unavailable, failed);
+                await sendReport(report);
+            }
+
+            // The report is already sent: one failed write (e.g. row deleted mid-run) must not skip the others.
+            foreach (var write in writes)
+            {
+                try
+                {
+                    await write();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Saving excursion state failed");
+                }
+            }
+
+            return report;
         }
     }
 }

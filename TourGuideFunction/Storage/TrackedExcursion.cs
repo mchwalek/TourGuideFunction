@@ -7,6 +7,7 @@ namespace TourGuideFunction.Storage
     {
         public const string Available = "Available";
         public const string Unavailable = "Unavailable";
+        public const string Error = "Error";
     }
 
     // One row per watched offer, edited by hand (e.g. in Azure Storage Explorer).

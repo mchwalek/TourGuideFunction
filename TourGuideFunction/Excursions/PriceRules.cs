@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace TourGuideFunction.Excursions
 {
     public static class PriceRules
@@ -5,7 +7,10 @@ namespace TourGuideFunction.Excursions
         // r.pl silently swaps unavailable offers for another date or airport.
         public static bool Matches(Excursion scraped, DateOnly expectedDateFrom, string expectedOrigin) =>
             scraped.DateFrom == expectedDateFrom
-            && string.Equals(scraped.OriginCity.Trim(), expectedOrigin.Trim(), StringComparison.OrdinalIgnoreCase);
+            && string.Equals(NormalizeSpaces(scraped.OriginCity), NormalizeSpaces(expectedOrigin), StringComparison.OrdinalIgnoreCase);
+
+        // r.pl uses &nbsp; inside names like "Warszawa Chopin".
+        private static string NormalizeSpaces(string value) => Regex.Replace(value, @"\s+", " ").Trim();
 
         // The first stored price only sets the baseline.
         public static bool ShouldNotify(int price, int threshold, int? lowestSoFar) =>

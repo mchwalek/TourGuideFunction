@@ -16,6 +16,10 @@ namespace TourGuideFunctionTests.Excursions
             PriceRules.Matches(Scraped, new DateOnly(2027, 6, 23), " katowice ").Should().BeTrue();
 
         [Fact]
+        public void Matches_OriginWithNonBreakingSpace_ReturnsTrue() =>
+            PriceRules.Matches(Scraped with { OriginCity = "Warszawa\u00A0Chopin" }, new DateOnly(2027, 6, 23), "Warszawa Chopin").Should().BeTrue();
+
+        [Fact]
         public void Matches_DifferentDate_ReturnsFalse() =>
             PriceRules.Matches(Scraped, new DateOnly(2027, 6, 30), "Katowice").Should().BeFalse();
 

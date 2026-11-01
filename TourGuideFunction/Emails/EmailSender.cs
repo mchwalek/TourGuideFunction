@@ -26,6 +26,8 @@ namespace TourGuideFunction
             var sendResult = await emailClient.SendAsync(Azure.WaitUntil.Completed, message);
 
             _logger.LogInformation("Email send status: {Status}", sendResult.Value.Status);
+            if (sendResult.Value.Status != EmailSendStatus.Succeeded)
+                throw new InvalidOperationException($"Email not sent: {sendResult.Value.Status}");
         }
     }
 }

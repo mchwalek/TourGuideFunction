@@ -7,9 +7,11 @@ namespace TourGuideFunction.Emails
 
     public record UnavailableExcursion(string Url, string ExpectedDateFrom, string ExpectedOrigin);
 
+    public record FailedExcursion(string Url, string Error);
+
     public static class EmailFormatter
     {
-        public static string Format(IReadOnlyCollection<PriceDrop> drops, IReadOnlyCollection<UnavailableExcursion> unavailable)
+        public static string Format(IReadOnlyCollection<PriceDrop> drops, IReadOnlyCollection<UnavailableExcursion> unavailable, IReadOnlyCollection<FailedExcursion> failed)
         {
             const string dateFormat = "yyyy-MM-dd";
 
@@ -33,6 +35,18 @@ namespace TourGuideFunction.Emails
                 foreach (var (url, expectedDateFrom, expectedOrigin) in unavailable)
                 {
                     stringBuilder.AppendLine($"{expectedDateFrom} | Wylot: {expectedOrigin}");
+                    stringBuilder.AppendLine(url);
+                }
+            }
+
+            if (failed.Count > 0)
+            {
+                if (stringBuilder.Length > 0)
+                    stringBuilder.AppendLine();
+                stringBuilder.AppendLine("Błąd sprawdzania:");
+                foreach (var (url, error) in failed)
+                {
+                    stringBuilder.AppendLine(error);
                     stringBuilder.AppendLine(url);
                 }
             }

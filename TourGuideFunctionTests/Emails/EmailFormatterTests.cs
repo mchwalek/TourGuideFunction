@@ -15,10 +15,12 @@ namespace TourGuideFunctionTests.Emails
 
         private static string Lines(params string[] lines) => string.Concat(lines.Select(l => l + Environment.NewLine));
 
+        private static readonly FailedExcursion Failed = new("https://r.pl/exc3", "Response status code does not indicate success: 403 (Forbidden).");
+
         [Fact]
         public void Format_PriceDrops_ListsNewPriceAndPreviousLow()
         {
-            var result = EmailFormatter.Format(new[] { Drop }, Array.Empty<UnavailableExcursion>());
+            var result = EmailFormatter.Format(new[] { Drop }, Array.Empty<UnavailableExcursion>(), Array.Empty<FailedExcursion>());
 
             result.Should().Be(Lines(
                 "Spadek ceny:",
@@ -29,7 +31,7 @@ namespace TourGuideFunctionTests.Emails
         [Fact]
         public void Format_UnavailableExcursions_ListsConfiguredDateAndOrigin()
         {
-            var result = EmailFormatter.Format(Array.Empty<PriceDrop>(), new[] { Unavailable });
+            var result = EmailFormatter.Format(Array.Empty<PriceDrop>(), new[] { Unavailable }, Array.Empty<FailedExcursion>());
 
             result.Should().Be(Lines(
                 "Niedostępne w skonfigurowanym terminie/wylocie:",
@@ -40,7 +42,7 @@ namespace TourGuideFunctionTests.Emails
         [Fact]
         public void Format_DropsAndUnavailable_SeparatesSectionsWithBlankLine()
         {
-            var result = EmailFormatter.Format(new[] { Drop }, new[] { Unavailable });
+            var result = EmailFormatter.Format(new[] { Drop }, new[] { Unavailable }, new[] { Failed });
 
             result.Should().Be(Lines(
                 "Spadek ceny:",
@@ -49,7 +51,22 @@ namespace TourGuideFunctionTests.Emails
                 "",
                 "Niedostępne w skonfigurowanym terminie/wylocie:",
                 "2023-10-01 | Wylot: Warszawa Chopin",
-                "https://r.pl/exc2"));
+                "https://r.pl/exc2",
+                "",
+                "Błąd sprawdzania:",
+                "Response status code does not indicate success: 403 (Forbidden).",
+                "https://r.pl/exc3"));
+        }
+
+        [Fact]
+        public void Format_FailedOnly_ListsErrorAndUrl()
+        {
+            var result = EmailFormatter.Format(Array.Empty<PriceDrop>(), Array.Empty<UnavailableExcursion>(), new[] { Failed });
+
+            result.Should().Be(Lines(
+                "Błąd sprawdzania:",
+                "Response status code does not indicate success: 403 (Forbidden).",
+                "https://r.pl/exc3"));
         }
     }
 }
