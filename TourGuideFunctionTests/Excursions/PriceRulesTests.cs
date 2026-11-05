@@ -42,5 +42,17 @@ namespace TourGuideFunctionTests.Excursions
         [Fact]
         public void ShouldNotify_NewLowBelowThreshold_ReturnsTrue() =>
             PriceRules.ShouldNotify(price: 2999, threshold: 3000, lowestSoFar: 3500).Should().BeTrue();
+
+        [Fact]
+        public void ShouldNotify_NoThresholdAndNewLow_ReturnsTrue() =>
+            PriceRules.ShouldNotify(price: 9000, threshold: null, lowestSoFar: 9001).Should().BeTrue();
+
+        [Fact]
+        public void ShouldNotify_NoThresholdAndNotNewLow_ReturnsFalse() =>
+            PriceRules.ShouldNotify(price: 9001, threshold: null, lowestSoFar: 9001).Should().BeFalse();
+
+        [Fact]
+        public void ShouldNotify_NoThresholdAndFirstPrice_ReturnsFalse() =>
+            PriceRules.ShouldNotify(price: 9000, threshold: null, lowestSoFar: null).Should().BeFalse();
     }
 }

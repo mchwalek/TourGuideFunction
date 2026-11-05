@@ -24,7 +24,8 @@ namespace TourGuideFunction.Storage
         /// <summary>yyyy-MM-dd</summary>
         public string ExpectedDateFrom { get; set; } = "";
         public string ExpectedOrigin { get; set; } = "";
-        public int Threshold { get; set; }
+        /// <summary>Notify only below this price; null notifies on every new lowest price.</summary>
+        public int? Threshold { get; set; }
         public bool Enabled { get; set; }
         /// <summary>Written by the app; see <see cref="ExcursionStatus"/>.</summary>
         public string? LastStatus { get; set; }

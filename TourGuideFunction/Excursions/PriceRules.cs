@@ -12,8 +12,8 @@ namespace TourGuideFunction.Excursions
         // r.pl uses &nbsp; inside names like "Warszawa Chopin".
         private static string NormalizeSpaces(string value) => Regex.Replace(value, @"\s+", " ").Trim();
 
-        // The first stored price only sets the baseline.
-        public static bool ShouldNotify(int price, int threshold, int? lowestSoFar) =>
-            lowestSoFar is int lowest && price < lowest && price < threshold;
+        // The first stored price only sets the baseline. No threshold means any new low counts.
+        public static bool ShouldNotify(int price, int? threshold, int? lowestSoFar) =>
+            lowestSoFar is int lowest && price < lowest && (threshold is null || price < threshold);
     }
 }

@@ -47,9 +47,9 @@ namespace TourGuideFunctionTests.Excursions
         // Sorts right after _id, so it is checked after it.
         private string SecondId => _id + "b";
 
-        private Task TrackAsync(string expectedOrigin, int threshold) => TrackAsync(_id, expectedOrigin, threshold);
+        private Task TrackAsync(string expectedOrigin, int? threshold) => TrackAsync(_id, expectedOrigin, threshold);
 
-        private Task TrackAsync(string id, string expectedOrigin, int threshold) =>
+        private Task TrackAsync(string id, string expectedOrigin, int? threshold) =>
             _service.GetTableClient(ExcursionStore.ExcursionsTable).AddEntityAsync(new TrackedExcursion
             {
                 RowKey = id,
@@ -82,6 +82,18 @@ namespace TourGuideFunctionTests.Excursions
 
             body.Should().Contain("2597 zł (poprzednio najniżej: 3000 zł)" + Environment.NewLine + _url);
             (await _store.GetLowestPriceAsync(_id)).Should().Be(2597);
+        }
+
+        [AzuriteFact]
+        public async Task CheckAsync_NoThresholdConfigured_ReportsAnyNewLow()
+        {
+            await TrackAsync("Katowice", threshold: null);
+            await _store.AddPricePointAsync(PricePoint.Create(_id, Now.AddDays(-1),
+                new Excursion("x", new DateOnly(2027, 6, 23), new DateOnly(2027, 6, 30), "Katowice", 2598)));
+
+            var body = await _monitor.CheckAsync(Now, SendOk);
+
+            body.Should().Contain("2597 zł (poprzednio najniżej: 2598 zł)" + Environment.NewLine + _url);
         }
 
         [AzuriteFact]
