@@ -1,15 +1,15 @@
-using System;
-using Azure.Communication.Email;
+using Azure.Data.Tables;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using PuppeteerSharp;
-using TourGuideFunction.Emails;
 using TourGuideFunction.Excursions;
+using TourGuideFunction.Storage;
 
 namespace TourGuideFunction
 {
     public class ScrapeExcursions
     {
+        private static readonly HttpClient Http = CreateHttpClient();
+
         private readonly ILogger _logger;
         private readonly EmailSender _emailSender;
 
@@ -22,33 +22,26 @@ namespace TourGuideFunction
         [Function("ScrapeExcursions")]
         public async Task Run([TimerTrigger("0 0 12 * * *")] MyInfo myTimer)
         {
+            // Config lives in tables, re-read every run, so edits apply without a restart.
+            var store = new ExcursionStore(new TableServiceClient(Environment.GetEnvironmentVariable("AzureWebJobsStorage")));
+            await store.InitializeAsync();
 
-            try
-            {
-                var excursionUris = Environment.GetEnvironmentVariable("SCRAPED_EXCURSIONS")!.Split(',').Select(x => new Uri(x)).ToList();
-                var excursions = new List<Excursion>(excursionUris.Count);
+            // Fail before scraping: results are only persisted once the report is sent.
+            var settings = await store.GetEmailSettingsAsync();
+            if (settings is null || string.IsNullOrWhiteSpace(settings.Sender) || string.IsNullOrWhiteSpace(settings.Recipients))
+                throw new InvalidOperationException(
+                    $"Email settings row ({ExcursionStore.SettingsTable} {EmailSettings.Partition}/{EmailSettings.Key}) is missing or has empty Sender/Recipients.");
 
-                using var browser = await Puppeteer.ConnectAsync(new ConnectOptions()
-                {
-                    DefaultViewport = new ViewPortOptions { Width = 1200 },
-                    BrowserWSEndpoint = Environment.GetEnvironmentVariable("BROWSERLESS_CONNECTION_STRING"),
-                });
-                using var page = await browser.NewPageAsync();
-
-                foreach (var uri in excursionUris)
-                {
-                    var excursion = await ExcursionScraper.GetExcursionAsync(page, uri);
-                    excursions.Add(excursion);
-                }
-
-                await _emailSender.SendAsync(excursions);
-            }
-            catch(Exception ex)
-            {
-                _logger.LogError("exception: {Message}", ex.Message);
-            }
+            var monitor = new ExcursionMonitor(store, Http, _logger, delayBetweenRequests: TimeSpan.FromSeconds(5));
+            await monitor.CheckAsync(DateTimeOffset.UtcNow, body => _emailSender.SendAsync(body, settings));
         }
 
+        private static HttpClient CreateHttpClient()
+        {
+            var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+            return http;
+        }
     }
 
     public class MyInfo

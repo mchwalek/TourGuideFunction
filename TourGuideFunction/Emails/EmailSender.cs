@@ -1,12 +1,6 @@
 ﻿using Azure.Communication.Email;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TourGuideFunction.Emails;
-using TourGuideFunction.Excursions;
+using TourGuideFunction.Storage;
 
 namespace TourGuideFunction
 {
@@ -18,21 +12,22 @@ namespace TourGuideFunction
             _logger = logger;
         }
 
-        public  async Task SendAsync(IEnumerable<Excursion> excursions)
+        public async Task SendAsync(string body, EmailSettings settings)
         {
             var emailClient = new EmailClient(Environment.GetEnvironmentVariable("EMAIL_COMMUNICATION_CONNECTION_STRING"));
 
-            var sender = Environment.GetEnvironmentVariable("EMAIL_COMMUNICATION_SENDER");
             var recipients = new EmailRecipients(
-                Environment.GetEnvironmentVariable("EMAIL_COMMUNICATION_RECIPIENTS")!.Split(',').Select(x => new EmailAddress(x)));
-            
+                settings.Recipients.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(x => new EmailAddress(x)));
+
             var message = new EmailMessage(
-                sender,
+                settings.Sender,
                 recipients,
-                new EmailContent("[TourGuide] ceny wycieczek") { PlainText = EmailFormatter.Format(excursions) });
+                new EmailContent("[TourGuide] ceny wycieczek") { PlainText = body });
             var sendResult = await emailClient.SendAsync(Azure.WaitUntil.Completed, message);
 
-            _logger.LogInformation($"Email send status: {sendResult.Value.Status}");
+            _logger.LogInformation("Email send status: {Status}", sendResult.Value.Status);
+            if (sendResult.Value.Status != EmailSendStatus.Succeeded)
+                throw new InvalidOperationException($"Email not sent: {sendResult.Value.Status}");
         }
     }
 }
