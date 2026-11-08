@@ -20,9 +20,9 @@ namespace TourGuideFunction.Excursions
             _delayBetweenRequests = delayBetweenRequests;
         }
 
-        /// <summary>Nothing is persisted until <paramref name="sendReport"/> succeeds, so a failed email is retried next run.</summary>
-        /// <returns>The report sent, or null when there was nothing to report.</returns>
-        public async Task<string?> CheckAsync(DateTimeOffset now, Func<string, Task> sendReport)
+        /// <summary>Nothing is persisted until both emails succeed, so a failed email is retried next run.</summary>
+        /// <returns>The bodies sent; null where there was nothing to send.</returns>
+        public async Task<(string? Report, string? Errors)> CheckAsync(DateTimeOffset now, Func<string, Task> sendReport, Func<string, Task> sendErrors)
         {
             var drops = new List<PriceDrop>();
             var unavailable = new List<UnavailableExcursion>();
@@ -55,7 +55,7 @@ namespace TourGuideFunction.Excursions
                     var lowest = await _store.GetLowestPriceAsync(tracked.RowKey);
                     writes.Add(() => _store.AddPricePointAsync(PricePoint.Create(tracked.RowKey, now, scraped)));
                     if (PriceRules.ShouldNotify(scraped.Price, tracked.Threshold, lowest))
-                        drops.Add(new PriceDrop(scraped, lowest!.Value, tracked.Url));
+                        drops.Add(new PriceDrop(scraped, lowest, tracked.Url));
                     if (tracked.LastStatus != ExcursionStatus.Available)
                         writes.Add(() => _store.SetLastStatusAsync(tracked.RowKey, ExcursionStatus.Available));
                 }
@@ -70,10 +70,18 @@ namespace TourGuideFunction.Excursions
                 }
             }
 
-            string? report = null;
-            if (drops.Count > 0 || unavailable.Count > 0 || failed.Count > 0)
+            // Errors go first: if the support email fails, users are not sent a report that would repeat next run.
+            string? errors = null;
+            if (failed.Count > 0)
             {
-                report = EmailFormatter.Format(drops, unavailable, failed);
+                errors = EmailFormatter.FormatFailures(failed);
+                await sendErrors(errors);
+            }
+
+            string? report = null;
+            if (drops.Count > 0 || unavailable.Count > 0)
+            {
+                report = EmailFormatter.Format(drops, unavailable);
                 await sendReport(report);
             }
 
@@ -90,7 +98,7 @@ namespace TourGuideFunction.Excursions
                 }
             }
 
-            return report;
+            return (report, errors);
         }
     }
 }

@@ -16,5 +16,7 @@ namespace TourGuideFunction.Storage
         public string Sender { get; set; } = "";
         /// <summary>Comma-separated addresses.</summary>
         public string Recipients { get; set; } = "";
+        /// <summary>Comma-separated addresses that receive error reports instead of <see cref="Recipients"/>.</summary>
+        public string SupportEmail { get; set; } = "";
     }
 }

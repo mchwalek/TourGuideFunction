@@ -12,17 +12,18 @@ namespace TourGuideFunction
             _logger = logger;
         }
 
-        public async Task SendAsync(string body, EmailSettings settings)
+        /// <param name="to">Comma-separated addresses.</param>
+        public async Task SendAsync(string subject, string body, string from, string to)
         {
             var emailClient = new EmailClient(Environment.GetEnvironmentVariable("EMAIL_COMMUNICATION_CONNECTION_STRING"));
 
             var recipients = new EmailRecipients(
-                settings.Recipients.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(x => new EmailAddress(x)));
+                to.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(x => new EmailAddress(x)));
 
             var message = new EmailMessage(
-                settings.Sender,
+                from,
                 recipients,
-                new EmailContent("[TourGuide] ceny wycieczek") { PlainText = body });
+                new EmailContent(subject) { PlainText = body });
             var sendResult = await emailClient.SendAsync(Azure.WaitUntil.Completed, message);
 
             _logger.LogInformation("Email send status: {Status}", sendResult.Value.Status);

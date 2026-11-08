@@ -20,7 +20,7 @@ namespace TourGuideFunctionTests.Emails
         [Fact]
         public void Format_PriceDrops_ListsNewPriceAndPreviousLow()
         {
-            var result = EmailFormatter.Format(new[] { Drop }, Array.Empty<UnavailableExcursion>(), Array.Empty<FailedExcursion>());
+            var result = EmailFormatter.Format(new[] { Drop }, Array.Empty<UnavailableExcursion>());
 
             result.Should().Be(Lines(
                 "Spadek ceny:",
@@ -29,9 +29,17 @@ namespace TourGuideFunctionTests.Emails
         }
 
         [Fact]
+        public void Format_FirstPriceDrop_SaysItIsTheFirstPrice()
+        {
+            var result = EmailFormatter.Format(new[] { Drop with { PreviousLow = null } }, Array.Empty<UnavailableExcursion>());
+
+            result.Should().Contain("123 zł (pierwsza cena)");
+        }
+
+        [Fact]
         public void Format_UnavailableExcursions_ListsConfiguredDateAndOrigin()
         {
-            var result = EmailFormatter.Format(Array.Empty<PriceDrop>(), new[] { Unavailable }, Array.Empty<FailedExcursion>());
+            var result = EmailFormatter.Format(Array.Empty<PriceDrop>(), new[] { Unavailable });
 
             result.Should().Be(Lines(
                 "Niedostępne w skonfigurowanym terminie/wylocie:",
@@ -42,7 +50,7 @@ namespace TourGuideFunctionTests.Emails
         [Fact]
         public void Format_DropsAndUnavailable_SeparatesSectionsWithBlankLine()
         {
-            var result = EmailFormatter.Format(new[] { Drop }, new[] { Unavailable }, new[] { Failed });
+            var result = EmailFormatter.Format(new[] { Drop }, new[] { Unavailable });
 
             result.Should().Be(Lines(
                 "Spadek ceny:",
@@ -51,17 +59,13 @@ namespace TourGuideFunctionTests.Emails
                 "",
                 "Niedostępne w skonfigurowanym terminie/wylocie:",
                 "2023-10-01 | Wylot: Warszawa Chopin",
-                "https://r.pl/exc2",
-                "",
-                "Błąd sprawdzania:",
-                "Response status code does not indicate success: 403 (Forbidden).",
-                "https://r.pl/exc3"));
+                "https://r.pl/exc2"));
         }
 
         [Fact]
-        public void Format_FailedOnly_ListsErrorAndUrl()
+        public void FormatFailures_ListsErrorAndUrl()
         {
-            var result = EmailFormatter.Format(Array.Empty<PriceDrop>(), Array.Empty<UnavailableExcursion>(), new[] { Failed });
+            var result = EmailFormatter.FormatFailures(new[] { Failed });
 
             result.Should().Be(Lines(
                 "Błąd sprawdzania:",
