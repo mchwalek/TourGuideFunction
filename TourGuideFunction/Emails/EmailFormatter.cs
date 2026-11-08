@@ -3,7 +3,8 @@ using TourGuideFunction.Excursions;
 
 namespace TourGuideFunction.Emails
 {
-    public record PriceDrop(Excursion Excursion, int PreviousLow, string Url);
+    /// <param name="PreviousLow">Null when this is the first price seen.</param>
+    public record PriceDrop(Excursion Excursion, int? PreviousLow, string Url);
 
     public record UnavailableExcursion(string Url, string ExpectedDateFrom, string ExpectedOrigin);
 
@@ -11,7 +12,7 @@ namespace TourGuideFunction.Emails
 
     public static class EmailFormatter
     {
-        public static string Format(IReadOnlyCollection<PriceDrop> drops, IReadOnlyCollection<UnavailableExcursion> unavailable, IReadOnlyCollection<FailedExcursion> failed)
+        public static string Format(IReadOnlyCollection<PriceDrop> drops, IReadOnlyCollection<UnavailableExcursion> unavailable)
         {
             const string dateFormat = "yyyy-MM-dd";
 
@@ -22,7 +23,8 @@ namespace TourGuideFunction.Emails
                 stringBuilder.AppendLine("Spadek ceny:");
                 foreach (var (excursion, previousLow, url) in drops)
                 {
-                    stringBuilder.AppendLine($"{excursion.Name} | {excursion.DateFrom.ToString(dateFormat)} - {excursion.DateTo.ToString(dateFormat)} | Wylot: {excursion.OriginCity} | {excursion.Price} zł (poprzednio najniżej: {previousLow} zł)");
+                    var previous = previousLow is int low ? $"poprzednio najniżej: {low} zł" : "pierwsza cena";
+                    stringBuilder.AppendLine($"{excursion.Name} | {excursion.DateFrom.ToString(dateFormat)} - {excursion.DateTo.ToString(dateFormat)} | Wylot: {excursion.OriginCity} | {excursion.Price} zł ({previous})");
                     stringBuilder.AppendLine(url);
                 }
             }
@@ -39,16 +41,17 @@ namespace TourGuideFunction.Emails
                 }
             }
 
-            if (failed.Count > 0)
+            return stringBuilder.ToString();
+        }
+
+        public static string FormatFailures(IReadOnlyCollection<FailedExcursion> failed)
+        {
+            var stringBuilder = new StringBuilder();
+            stringBuilder.AppendLine("Błąd sprawdzania:");
+            foreach (var (url, error) in failed)
             {
-                if (stringBuilder.Length > 0)
-                    stringBuilder.AppendLine();
-                stringBuilder.AppendLine("Błąd sprawdzania:");
-                foreach (var (url, error) in failed)
-                {
-                    stringBuilder.AppendLine(error);
-                    stringBuilder.AppendLine(url);
-                }
+                stringBuilder.AppendLine(error);
+                stringBuilder.AppendLine(url);
             }
 
             return stringBuilder.ToString();

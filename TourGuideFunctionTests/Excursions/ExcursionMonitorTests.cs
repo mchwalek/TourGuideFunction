@@ -61,13 +61,24 @@ namespace TourGuideFunctionTests.Excursions
             });
 
         [AzuriteFact]
-        public async Task CheckAsync_FirstPrice_StoresItWithoutReporting()
+        public async Task CheckAsync_FirstPriceWithoutThreshold_StoresItWithoutReporting()
+        {
+            await TrackAsync("Katowice", threshold: null);
+
+            var (body, _) = await _monitor.CheckAsync(Now, SendOk, SendOk);
+
+            (body ?? "").Should().NotContain(_url);
+            (await _store.GetLowestPriceAsync(_id)).Should().Be(2597);
+        }
+
+        [AzuriteFact]
+        public async Task CheckAsync_FirstPriceBelowThreshold_ReportsDrop()
         {
             await TrackAsync("Katowice", threshold: 9999);
 
-            var body = await _monitor.CheckAsync(Now, SendOk);
+            var (body, _) = await _monitor.CheckAsync(Now, SendOk, SendOk);
 
-            (body ?? "").Should().NotContain(_url);
+            body.Should().Contain("2597 zł (pierwsza cena)" + Environment.NewLine + _url);
             (await _store.GetLowestPriceAsync(_id)).Should().Be(2597);
         }
 
@@ -78,7 +89,7 @@ namespace TourGuideFunctionTests.Excursions
             await _store.AddPricePointAsync(PricePoint.Create(_id, Now.AddDays(-1),
                 new Excursion("x", new DateOnly(2027, 6, 23), new DateOnly(2027, 6, 30), "Katowice", 3000)));
 
-            var body = await _monitor.CheckAsync(Now, SendOk);
+            var (body, _) = await _monitor.CheckAsync(Now, SendOk, SendOk);
 
             body.Should().Contain("2597 zł (poprzednio najniżej: 3000 zł)" + Environment.NewLine + _url);
             (await _store.GetLowestPriceAsync(_id)).Should().Be(2597);
@@ -91,7 +102,7 @@ namespace TourGuideFunctionTests.Excursions
             await _store.AddPricePointAsync(PricePoint.Create(_id, Now.AddDays(-1),
                 new Excursion("x", new DateOnly(2027, 6, 23), new DateOnly(2027, 6, 30), "Katowice", 2598)));
 
-            var body = await _monitor.CheckAsync(Now, SendOk);
+            var (body, _) = await _monitor.CheckAsync(Now, SendOk, SendOk);
 
             body.Should().Contain("2597 zł (poprzednio najniżej: 2598 zł)" + Environment.NewLine + _url);
         }
@@ -101,8 +112,8 @@ namespace TourGuideFunctionTests.Excursions
         {
             await TrackAsync("Gdańsk", threshold: 9999);
 
-            var first = await _monitor.CheckAsync(Now, SendOk);
-            var second = await _monitor.CheckAsync(Now.AddDays(1), SendOk);
+            var (first, _) = await _monitor.CheckAsync(Now, SendOk, SendOk);
+            var (second, _) = await _monitor.CheckAsync(Now.AddDays(1), SendOk, SendOk);
 
             first.Should().Contain("2027-06-23 | Wylot: Gdańsk" + Environment.NewLine + _url);
             (second ?? "").Should().NotContain(_url);
@@ -116,25 +127,43 @@ namespace TourGuideFunctionTests.Excursions
             await _store.AddPricePointAsync(PricePoint.Create(_id, Now.AddDays(-1),
                 new Excursion("x", new DateOnly(2027, 6, 23), new DateOnly(2027, 6, 30), "Katowice", 3000)));
 
-            var failedRun = () => _monitor.CheckAsync(Now, _ => throw new InvalidOperationException("email down"));
+            var failedRun = () => _monitor.CheckAsync(Now, _ => throw new InvalidOperationException("email down"), SendOk);
             await failedRun.Should().ThrowAsync<InvalidOperationException>();
             (await _store.GetLowestPriceAsync(_id)).Should().Be(3000);
 
-            var body = await _monitor.CheckAsync(Now.AddDays(1), SendOk);
+            var (body, _) = await _monitor.CheckAsync(Now.AddDays(1), SendOk, SendOk);
             body.Should().Contain("2597 zł (poprzednio najniżej: 3000 zł)");
         }
 
         [AzuriteFact]
-        public async Task CheckAsync_HttpError_ReportsFailureOnce()
+        public async Task CheckAsync_HttpError_SendsFailureOnceToSupportOnly()
         {
             await TrackAsync("Katowice", threshold: 9999);
             var monitor = CreateMonitor(new StaticHtmlHandler(HttpStatusCode.Forbidden, ""));
 
-            var first = await monitor.CheckAsync(Now, SendOk);
-            var second = await monitor.CheckAsync(Now.AddDays(1), SendOk);
+            var first = await monitor.CheckAsync(Now, SendOk, SendOk);
+            var second = await monitor.CheckAsync(Now.AddDays(1), SendOk, SendOk);
 
-            first.Should().Contain("Błąd sprawdzania:").And.Contain("403").And.Contain(_url);
-            (second ?? "").Should().NotContain(_url);
+            first.Errors.Should().Contain("Błąd sprawdzania:").And.Contain("403").And.Contain(_url);
+            first.Report.Should().BeNull();
+            (second.Errors ?? "").Should().NotContain(_url);
+        }
+
+        [AzuriteFact]
+        public async Task CheckAsync_SupportSendFails_SendsNoReportAndPersistsNothing()
+        {
+            await TrackAsync("Katowice", threshold: 9999);
+            await TrackAsync(SecondId, "Katowice", threshold: 9999);
+            var reportSent = false;
+            var monitor = CreateMonitor(new FailingSecondRequestHandler(
+                File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Excursions", "Fixtures", "offer.html"))));
+
+            var failedRun = () => monitor.CheckAsync(Now, _ => { reportSent = true; return Task.CompletedTask; },
+                _ => throw new InvalidOperationException("email down"));
+
+            await failedRun.Should().ThrowAsync<InvalidOperationException>();
+            reportSent.Should().BeFalse();
+            (await _store.GetLowestPriceAsync(_id)).Should().BeNull();
         }
 
         [AzuriteFact]
@@ -146,7 +175,7 @@ namespace TourGuideFunctionTests.Excursions
                 new Excursion("x", new DateOnly(2027, 6, 23), new DateOnly(2027, 6, 30), "Katowice", 3000)));
 
             await _monitor.CheckAsync(Now, _ =>
-                _service.GetTableClient(ExcursionStore.ExcursionsTable).DeleteEntityAsync(TrackedExcursion.Partition, _id));
+                _service.GetTableClient(ExcursionStore.ExcursionsTable).DeleteEntityAsync(TrackedExcursion.Partition, _id), SendOk);
 
             (await _store.GetLowestPriceAsync(SecondId)).Should().Be(2597);
         }
@@ -155,6 +184,16 @@ namespace TourGuideFunctionTests.Excursions
         {
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
                 Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(html) });
+        }
+
+        private sealed class FailingSecondRequestHandler(string html) : HttpMessageHandler
+        {
+            private int _requests;
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+                Task.FromResult(++_requests == 1
+                    ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(html) }
+                    : new HttpResponseMessage(HttpStatusCode.Forbidden));
         }
     }
 }

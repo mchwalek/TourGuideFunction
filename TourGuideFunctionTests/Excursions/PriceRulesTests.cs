@@ -28,8 +28,12 @@ namespace TourGuideFunctionTests.Excursions
             PriceRules.Matches(Scraped, new DateOnly(2027, 6, 23), "Warszawa Chopin").Should().BeFalse();
 
         [Fact]
-        public void ShouldNotify_FirstPrice_ReturnsFalse() =>
-            PriceRules.ShouldNotify(price: 1000, threshold: 5000, lowestSoFar: null).Should().BeFalse();
+        public void ShouldNotify_FirstPriceBelowThreshold_ReturnsTrue() =>
+            PriceRules.ShouldNotify(price: 1000, threshold: 5000, lowestSoFar: null).Should().BeTrue();
+
+        [Fact]
+        public void ShouldNotify_FirstPriceNotBelowThreshold_ReturnsFalse() =>
+            PriceRules.ShouldNotify(price: 5000, threshold: 5000, lowestSoFar: null).Should().BeFalse();
 
         [Fact]
         public void ShouldNotify_EqualToLowest_ReturnsFalse() =>

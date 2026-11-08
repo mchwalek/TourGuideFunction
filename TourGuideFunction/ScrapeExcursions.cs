@@ -28,12 +28,15 @@ namespace TourGuideFunction
 
             // Fail before scraping: results are only persisted once the report is sent.
             var settings = await store.GetEmailSettingsAsync();
-            if (settings is null || string.IsNullOrWhiteSpace(settings.Sender) || string.IsNullOrWhiteSpace(settings.Recipients))
+            if (settings is null || string.IsNullOrWhiteSpace(settings.Sender) || string.IsNullOrWhiteSpace(settings.Recipients) || string.IsNullOrWhiteSpace(settings.SupportEmail))
                 throw new InvalidOperationException(
-                    $"Email settings row ({ExcursionStore.SettingsTable} {EmailSettings.Partition}/{EmailSettings.Key}) is missing or has empty Sender/Recipients.");
+                    $"Email settings row ({ExcursionStore.SettingsTable} {EmailSettings.Partition}/{EmailSettings.Key}) is missing or has empty Sender/Recipients/SupportEmail.");
 
             var monitor = new ExcursionMonitor(store, Http, _logger, delayBetweenRequests: TimeSpan.FromSeconds(5));
-            await monitor.CheckAsync(DateTimeOffset.UtcNow, body => _emailSender.SendAsync(body, settings));
+            await monitor.CheckAsync(
+                DateTimeOffset.UtcNow,
+                body => _emailSender.SendAsync("[TourGuide] ceny wycieczek", body, settings.Sender, settings.Recipients),
+                body => _emailSender.SendAsync("[TourGuide] błędy sprawdzania", body, settings.Sender, settings.SupportEmail));
         }
 
         private static HttpClient CreateHttpClient()
