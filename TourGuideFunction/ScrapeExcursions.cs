@@ -20,7 +20,7 @@ namespace TourGuideFunction
         }
 
         [Function("ScrapeExcursions")]
-        public async Task Run([TimerTrigger("0 0 12 * * *")] MyInfo myTimer)
+        public async Task Run([TimerTrigger("0 0 18 * * *")] MyInfo myTimer)
         {
             // Config lives in tables, re-read every run, so edits apply without a restart.
             var store = new ExcursionStore(new TableServiceClient(Environment.GetEnvironmentVariable("AzureWebJobsStorage")));
